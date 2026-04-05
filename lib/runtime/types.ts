@@ -50,7 +50,14 @@ export type SliderConfig = {
   step: number;
 };
 
-export type ColorMode = "solid" | "viridis" | "ocean" | "sunset";
+export type ColorMode =
+  | "solid"
+  | "viridis"
+  | "plasma"
+  | "inferno"
+  | "magma"
+  | "cividis"
+  | "turbo";
 
 export type CellDisplayOptions = {
   visible: boolean;

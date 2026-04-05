@@ -1,16 +1,27 @@
 import type { ColorMode } from "@/lib/runtime/types";
 
-export const COLOR_MODES: { label: string; value: ColorMode }[] = [
+export const COLOR_MODE_OPTIONS: { label: string; value: ColorMode }[] = [
   { label: "Solid", value: "solid" },
   { label: "Viridis", value: "viridis" },
-  { label: "Ocean", value: "ocean" },
-  { label: "Sunset", value: "sunset" },
+  { label: "Plasma", value: "plasma" },
+  { label: "Inferno", value: "inferno" },
+  { label: "Magma", value: "magma" },
+  { label: "Cividis", value: "cividis" },
+  { label: "Turbo", value: "turbo" },
 ];
 
-const palettes: Record<Exclude<ColorMode, "solid">, string[]> = {
-  ocean: ["#0f172a", "#0ea5e9", "#5eead4", "#d1fae5"],
-  sunset: ["#7f1d1d", "#ea580c", "#f59e0b", "#fef3c7"],
+const schemePalettes: Record<Exclude<ColorMode, "solid">, string[]> = {
   viridis: ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"],
+  plasma: ["#0d0887", "#7e03a8", "#cc4778", "#f89540", "#f0f921"],
+  inferno: ["#000004", "#57106e", "#bc3754", "#f98e09", "#fcffa4"],
+  magma: ["#000004", "#51127c", "#b63679", "#fb8861", "#fcfdbf"],
+  cividis: ["#00224e", "#123570", "#406e89", "#8a9a5b", "#fde725"],
+  turbo: ["#30123b", "#4662d7", "#35aac3", "#a3dc38", "#f9fb0e"],
+};
+
+const legacyColorModeMap: Record<string, ColorMode> = {
+  ocean: "cividis",
+  sunset: "inferno",
 };
 
 function hexToRgb(hex: string) {
@@ -39,13 +50,55 @@ function interpolateColor(start: string, end: string, t: number) {
   );
 }
 
-export function colorForIndex(baseColor: string, mode: ColorMode, index: number, total: number) {
-  if (mode === "solid" || total <= 1) {
-    return baseColor;
+function mixColor(base: string, target: string, amount: number) {
+  return interpolateColor(base, target, amount);
+}
+
+function solidPalette(baseColor: string) {
+  return [
+    mixColor(baseColor, "#111827", 0.42),
+    mixColor(baseColor, "#111827", 0.18),
+    baseColor,
+    mixColor(baseColor, "#ffffff", 0.18),
+    mixColor(baseColor, "#ffffff", 0.38),
+  ];
+}
+
+export function normalizeColorMode(mode: unknown): ColorMode {
+  if (mode === "solid") {
+    return "solid";
   }
 
-  const palette = palettes[mode];
-  const position = total === 1 ? 0 : index / Math.max(total - 1, 1);
+  if (typeof mode === "string" && mode in schemePalettes) {
+    return mode as Exclude<ColorMode, "solid">;
+  }
+
+  if (typeof mode === "string" && mode in legacyColorModeMap) {
+    return legacyColorModeMap[mode];
+  }
+
+  return "viridis";
+}
+
+export function paletteForMode(baseColor: string, mode: ColorMode | string) {
+  const normalizedMode = normalizeColorMode(mode);
+  return normalizedMode === "solid"
+    ? solidPalette(baseColor)
+    : schemePalettes[normalizedMode];
+}
+
+export function representativeColor(mode: ColorMode, baseColor: string) {
+  const palette = paletteForMode(baseColor, mode);
+  return palette[Math.floor(palette.length / 2)] ?? baseColor;
+}
+
+export function colorForIndex(baseColor: string, mode: ColorMode, index: number, total: number) {
+  const palette = paletteForMode(baseColor, mode);
+  if (total <= 1) {
+    return representativeColor(mode, baseColor);
+  }
+
+  const position = index / Math.max(total - 1, 1);
   const scaled = position * (palette.length - 1);
   const lowerIndex = Math.floor(scaled);
   const upperIndex = Math.min(lowerIndex + 1, palette.length - 1);

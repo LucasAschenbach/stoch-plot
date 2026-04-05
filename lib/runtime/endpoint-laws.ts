@@ -13,6 +13,7 @@ import type {
 
 const MAX_COMBINATIONS = 40000;
 const CONTINUOUS_POINTS = 121;
+const SUPPORT_EPSILON = 1e-9;
 
 function normalizeWeights(weights: number[]) {
   const total = weights.reduce((sum, value) => sum + value, 0);
@@ -44,8 +45,6 @@ type WeightedSamples = {
 type EndpointLawOptions = {
   support?: EndpointLawSupport;
 };
-
-const SUPPORT_EPSILON = 1e-9;
 
 function clampSupportValue(value?: number) {
   return value !== undefined && Number.isFinite(value) ? value : undefined;

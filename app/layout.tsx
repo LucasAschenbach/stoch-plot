@@ -1,34 +1,51 @@
-import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
+import './globals.css'
 
-const sans = Manrope({
-  variable: "--font-geist-sans",
+const geist = Geist({
   subsets: ["latin"],
+  variable: "--font-geist",
 });
-
-const serif = Cormorant_Garamond({
-  variable: "--font-editorial",
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
-  title: "Stochastic Plotter",
-  description: "Desmos-style notebook for stochastic processes and pathwise exploration.",
-};
+  title: 'Desmos for Stochastic Processes',
+  description: 'Interactive notebook for stochastic processes, sampled paths, and endpoint laws.',
+  generator: 'v0.app',
+  icons: {
+    icon: [
+      {
+        url: '/icon-light-32x32.png',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/icon-dark-32x32.png',
+        media: '(prefers-color-scheme: dark)',
+      },
+      {
+        url: '/icon.svg',
+        type: 'image/svg+xml',
+      },
+    ],
+    apple: '/apple-icon.png',
+  },
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${sans.variable} ${serif.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en">
+      <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
+        {children}
+        {process.env.NODE_ENV === 'production' && <Analytics />}
+      </body>
     </html>
-  );
+  )
 }

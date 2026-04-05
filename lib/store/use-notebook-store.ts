@@ -12,9 +12,10 @@ import type {
   ToolbarState,
   Viewport,
 } from "@/lib/runtime/types";
+import { normalizeColorMode } from "@/lib/utils/color";
 import { computeDefaultViewport } from "@/lib/utils/plotting";
 
-const STORAGE_KEY = "stochastic-plotter-state-v1";
+const STORAGE_KEY = "stochastic-plotter-state-v2";
 
 const defaultDisplay = (color: string): CellDisplayOptions => ({
   visible: true,
@@ -33,6 +34,18 @@ const defaultSlider = (value = 1): SliderConfig => ({
   step: 0.1,
 });
 
+function normalizeDisplay(
+  display: Partial<CellDisplayOptions> | undefined,
+  fallbackColor: string,
+): CellDisplayOptions {
+  return {
+    ...defaultDisplay(fallbackColor),
+    ...display,
+    color: display?.color ?? fallbackColor,
+    colorMode: normalizeColorMode(display?.colorMode),
+  };
+}
+
 function makeCell(id: string, source: string, color: string, slider = defaultSlider()) {
   return {
     id,
@@ -41,21 +54,6 @@ function makeCell(id: string, source: string, color: string, slider = defaultSli
     slider,
   } satisfies NotebookCell;
 }
-
-export const PRESET_CELLS = [
-  { label: "Brownian motion", source: "B_t = Brownian()", color: "#2563eb" },
-  {
-    label: "Geometric Brownian",
-    source: "S_t = GeometricBrownian(mu, sigma, x0)",
-    color: "#f97316",
-  },
-  {
-    label: "Ornstein-Uhlenbeck",
-    source: "X_t = OrnsteinUhlenbeck(theta, m, sigma, x0)",
-    color: "#14b8a6",
-  },
-  { label: "Poisson", source: "N_t = Poisson(lambda)", color: "#a855f7" },
-];
 
 function initialCells() {
   return [
@@ -85,11 +83,11 @@ function initialCells() {
 
 function initialToolbar(): ToolbarState {
   return {
-    seed: 7,
+    seed: 42,
     tMin: 0,
     tMax: 1,
-    points: 160,
-    distributionPanel: true,
+    points: 1001,
+    distributionPanel: false,
   };
 }
 
@@ -112,7 +110,6 @@ type NotebookState = {
   updateDisplay: (cellId: string, patch: Partial<CellDisplayOptions>) => void;
   updateSlider: (cellId: string, patch: Partial<SliderConfig>) => void;
   addCell: (source?: string) => void;
-  addPreset: (source: string, color: string) => void;
   moveCell: (activeId: string, overId: string) => void;
   removeCell: (cellId: string) => void;
 };
@@ -200,10 +197,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
       const cells = parsed.cells?.length
         ? parsed.cells.map((cell) => ({
             ...cell,
-            display: {
-              ...defaultDisplay(cell.display?.color ?? "#2563eb"),
-              ...cell.display,
-            },
+            display: normalizeDisplay(cell.display, cell.display?.color ?? "#2563eb"),
             slider: {
               ...defaultSlider(),
               ...cell.slider,
@@ -317,18 +311,6 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
     const id = `cell-${Math.random().toString(36).slice(2, 8)}`;
     const palette = ["#2563eb", "#f97316", "#16a34a", "#a855f7", "#0891b2"];
     const nextCells = [...cells, makeCell(id, source, palette[cells.length % palette.length])];
-    const evaluation = computeEvaluation(nextCells, toolbar, rngVersion);
-    persist(nextCells, toolbar, rngVersion, viewport);
-    set({
-      cells: nextCells,
-      evaluation,
-      viewport,
-    });
-  },
-  addPreset: (source, color) => {
-    const { cells, toolbar, rngVersion, viewport } = get();
-    const id = `cell-${Math.random().toString(36).slice(2, 8)}`;
-    const nextCells = [...cells, makeCell(id, source, color)];
     const evaluation = computeEvaluation(nextCells, toolbar, rngVersion);
     persist(nextCells, toolbar, rngVersion, viewport);
     set({

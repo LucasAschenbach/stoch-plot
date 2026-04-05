@@ -50,7 +50,7 @@ function withStatistics(
 }
 
 function brownianStats(scale = 1) {
-  return (args: number[], times: number[]) => ({
+  return (_args: number[], times: number[]) => ({
     mean: () => times.map(() => 0),
     variance: () => times.map((time) => scale * scale * Math.max(0, time)),
     endpointExpectation: () => 0,
@@ -105,7 +105,7 @@ const definitions: ProcessDefinition[] = [
           ),
           randomnessHandle: `seed:${context.rng.seed}`,
         },
-        brownianStats()( [], context.times),
+        brownianStats()([], context.times),
       );
     },
     stats: brownianStats(),

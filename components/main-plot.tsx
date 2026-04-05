@@ -237,15 +237,22 @@ export function MainPlot({ items }: { items: PlotItem[] }) {
       return;
     }
 
+    const styles = getComputedStyle(document.documentElement);
+    const background = styles.getPropertyValue("--background").trim() || "#ffffff";
+    const border = styles.getPropertyValue("--border").trim() || "#e5e7eb";
+    const foreground = styles.getPropertyValue("--foreground").trim() || "#111827";
+    const mutedForeground =
+      styles.getPropertyValue("--muted-foreground").trim() || "#6b7280";
+
     context.clearRect(0, 0, size.width, size.height);
-    context.fillStyle = "#ffffff";
+    context.fillStyle = background;
     context.fillRect(0, 0, size.width, size.height);
 
     const plot = getPlotArea({ width: size.width, height: size.height }, MAIN_PLOT_PADDING);
     const xTicks = generateTicks(viewport.xMin, viewport.xMax);
     const yTicks = generateTicks(viewport.yMin, viewport.yMax);
 
-    context.strokeStyle = "#e5e7eb";
+    context.strokeStyle = border;
     context.lineWidth = 1;
     xTicks.forEach((tick) => {
       const x = worldToScreenX(tick, viewport, { width: size.width, height: size.height }, MAIN_PLOT_PADDING);
@@ -334,25 +341,25 @@ export function MainPlot({ items }: { items: PlotItem[] }) {
     context.restore();
     context.globalAlpha = 1;
 
-    context.strokeStyle = hoverMode === "scale-x" ? "#111827" : "#9ca3af";
+    context.strokeStyle = hoverMode === "scale-x" ? foreground : border;
     context.lineWidth = hoverMode === "scale-x" ? 2 : 1;
     context.beginPath();
     context.moveTo(plot.x, plot.y + plot.height);
     context.lineTo(plot.x + plot.width, plot.y + plot.height);
     context.stroke();
 
-    context.strokeStyle = hoverMode === "scale-y" ? "#111827" : "#9ca3af";
+    context.strokeStyle = hoverMode === "scale-y" ? foreground : border;
     context.lineWidth = hoverMode === "scale-y" ? 2 : 1;
     context.beginPath();
     context.moveTo(plot.x, plot.y);
     context.lineTo(plot.x, plot.y + plot.height);
     context.stroke();
 
-    context.strokeStyle = "#111827";
+    context.strokeStyle = foreground;
     context.lineWidth = 1;
     context.strokeRect(plot.x, plot.y, plot.width, plot.height);
 
-    context.fillStyle = "#4b5563";
+    context.fillStyle = mutedForeground;
     context.font = "12px sans-serif";
     context.textAlign = "center";
     xTicks.forEach((tick) => {
@@ -368,10 +375,13 @@ export function MainPlot({ items }: { items: PlotItem[] }) {
   }, [chartData, hoveredCellId, hoverMode, size.height, size.width, viewport]);
 
   return (
-    <section className="flex min-w-0 flex-1 border-r border-stone-200">
-      <div ref={containerRef} className="relative h-full w-full bg-white">
+    <section className="flex min-w-0 flex-1 border-r border-border bg-background">
+      <div ref={containerRef} className="relative h-full w-full bg-background">
         {chartData.length > 0 ? (
-          <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-[70%] flex-wrap gap-2">
+          <div
+            className="pointer-events-none absolute top-4 z-20 flex max-w-[70%] flex-wrap gap-2"
+            style={{ left: `${MAIN_PLOT_PADDING.left + 12}px` }}
+          >
             {chartData.map((item) => {
               const active = hoveredCellId === item.cell.id;
               const dimmed = hoveredCellId !== null && hoveredCellId !== item.cell.id;
@@ -381,12 +391,12 @@ export function MainPlot({ items }: { items: PlotItem[] }) {
                   type="button"
                   onPointerEnter={() => setHoveredCellId(item.cell.id)}
                   onPointerLeave={() => setHoveredCellId(null)}
-                  className={`pointer-events-auto flex items-center gap-2 border px-2 py-1 text-xs ${
+                  className={`pointer-events-auto flex items-center gap-2 rounded-md border px-2 py-1 text-xs ${
                     active
-                      ? "border-stone-900 bg-stone-900 text-white"
+                      ? "border-foreground bg-foreground text-background"
                       : dimmed
-                        ? "border-stone-200 bg-white text-stone-400"
-                        : "border-stone-300 bg-white text-stone-700"
+                        ? "border-border bg-card text-muted-foreground/60"
+                        : "border-border bg-card text-foreground"
                   }`}
                 >
                   <span

@@ -66,14 +66,19 @@ export function DistributionPanel({ items }: { items: PlotItem[] }) {
       return;
     }
 
+    const styles = getComputedStyle(document.documentElement);
+    const background = styles.getPropertyValue("--background").trim() || "#ffffff";
+    const border = styles.getPropertyValue("--border").trim() || "#e5e7eb";
+    const foreground = styles.getPropertyValue("--foreground").trim() || "#111827";
+
     context.clearRect(0, 0, size.width, size.height);
-    context.fillStyle = "#ffffff";
+    context.fillStyle = background;
     context.fillRect(0, 0, size.width, size.height);
 
     const plot = getPlotArea({ width: size.width, height: size.height }, DIST_PLOT_PADDING);
     const yTicks = generateTicks(viewport.yMin, viewport.yMax);
 
-    context.strokeStyle = "#e5e7eb";
+    context.strokeStyle = border;
     context.lineWidth = 1;
     yTicks.forEach((tick) => {
       const y = worldToScreenY(
@@ -172,13 +177,13 @@ export function DistributionPanel({ items }: { items: PlotItem[] }) {
       }
     });
 
-    context.strokeStyle = "#111827";
+    context.strokeStyle = foreground;
     context.lineWidth = 1;
     context.strokeRect(plot.x, plot.y, plot.width, plot.height);
   }, [chartData, densityY, hoveredCellId, size.height, size.width, viewport]);
 
   return (
-    <aside className="h-full w-[320px] shrink-0 border-l border-stone-200 bg-white">
+    <aside className="h-full w-[320px] shrink-0 border-l border-border bg-background">
       <div ref={containerRef} className="h-full w-full">
         <canvas ref={canvasRef} className="h-full w-full" />
       </div>

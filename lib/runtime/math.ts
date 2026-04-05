@@ -55,10 +55,6 @@ export function varianceByIndex(paths: number[][]) {
   return paths[0].map((_, index) => variance(paths.map((path) => path[index] ?? 0)));
 }
 
-export function stdByIndex(paths: number[][]) {
-  return varianceByIndex(paths).map((value) => Math.sqrt(value));
-}
-
 export function normalPdf(x: number, meanValue: number, stdDev: number) {
   if (stdDev <= 0) {
     return 0;
@@ -99,8 +95,4 @@ export function logNormalPdf(x: number, mu: number, sigma: number) {
 
   const z = (Math.log(x) - mu) / sigma;
   return Math.exp(-0.5 * z * z) / (x * sigma * Math.sqrt(2 * Math.PI));
-}
-
-export function safeDivide(value: number, divisor: number) {
-  return divisor === 0 ? 0 : value / divisor;
 }

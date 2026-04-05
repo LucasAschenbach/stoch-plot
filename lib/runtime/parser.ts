@@ -413,11 +413,9 @@ export function inferExpressionType(
         return firstArgType === "process" ? "process" : "number";
       }
 
-      if (node.callee === "Brownian" || node.callee === "BrownianBridge") {
-        return "process";
-      }
-
       if (
+        node.callee === "Brownian" ||
+        node.callee === "BrownianBridge" ||
         node.callee === "GeometricBrownian" ||
         node.callee === "OrnsteinUhlenbeck" ||
         node.callee === "Poisson" ||
