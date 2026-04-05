@@ -289,6 +289,7 @@ export function MainPlot({
 
       const dimmed = hoveredCellId !== null && hoveredCellId !== cell.id;
       const emphasis = hoveredCellId === cell.id;
+      context.save();
 
       if (value.type === "process") {
         if (cell.display.showVariance) {
@@ -328,6 +329,7 @@ export function MainPlot({
           drawPath(context, value.times, value.mean, viewport, size.width, size.height);
           context.restore();
         }
+        context.restore();
         return;
       }
 
@@ -341,6 +343,7 @@ export function MainPlot({
         context.globalAlpha = dimmed ? 0.2 : 1;
         drawPath(context, xs, ys, viewport, size.width, size.height);
       }
+      context.restore();
     });
 
     context.restore();
