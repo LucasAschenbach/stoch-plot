@@ -2,6 +2,7 @@ import {
   affineEndpointLaw,
   constantEndpointLaw,
   addEndpointLaws,
+  monotoneTransformEndpointLaw,
   powerEndpointLaw,
   subtractEndpointLaws,
   transformEndpointLaw,
@@ -112,6 +113,68 @@ function numberLaw(value: number) {
   return constantEndpointLaw(value);
 }
 
+function scalarBuiltinEndpointLaw(
+  name: string,
+  law: Exclude<RuntimeValue, { type: "number" | "function" }>["endpointLaw"],
+) {
+  if (!law) {
+    return undefined;
+  }
+
+  switch (name) {
+    case "exp":
+      return monotoneTransformEndpointLaw(
+        law,
+        Math.exp,
+        Math.log,
+        (value) => (value > 0 ? 1 / value : 0),
+        { support: { min: 0 } },
+      );
+    case "log":
+      if (law.support?.min !== undefined && law.support.min > 0) {
+        return monotoneTransformEndpointLaw(
+          law,
+          Math.log,
+          Math.exp,
+          Math.exp,
+          {
+            support: {
+              min: Math.log(law.support.min),
+              max:
+                law.support.max !== undefined ? Math.log(law.support.max) : undefined,
+            },
+          },
+        );
+      }
+      return transformEndpointLaw(law, Math.log);
+    case "sqrt":
+      if (law.support?.min !== undefined && law.support.min >= 0) {
+        return monotoneTransformEndpointLaw(
+          law,
+          Math.sqrt,
+          (value) => value * value,
+          (value) => 2 * Math.max(value, 0),
+          { support: { min: 0 } },
+        );
+      }
+      return transformEndpointLaw(law, Math.sqrt);
+    case "abs":
+      return transformEndpointLaw(law, Math.abs, {
+        support: { min: 0 },
+        densityAt: law.densityAt
+          ? (value) => {
+              if (value < 0) {
+                return 0;
+              }
+              return law.densityAt(value) + law.densityAt(-value);
+            }
+          : undefined,
+      });
+    default:
+      return transformEndpointLaw(law, (value) => SCALAR_FUNCTIONS[name](value));
+  }
+}
+
 function binaryEndpointLaw(
   left: RuntimeValue,
   right: RuntimeValue,
@@ -128,8 +191,20 @@ function binaryEndpointLaw(
 
   switch (operator) {
     case "+":
+      if (left.type === "number") {
+        return affineEndpointLaw(rightLaw, 1, left.value);
+      }
+      if (right.type === "number") {
+        return affineEndpointLaw(leftLaw, 1, right.value);
+      }
       return addEndpointLaws(leftLaw, rightLaw);
     case "-":
+      if (left.type === "number") {
+        return affineEndpointLaw(rightLaw, -1, left.value);
+      }
+      if (right.type === "number") {
+        return affineEndpointLaw(leftLaw, 1, -right.value);
+      }
       return subtractEndpointLaws(leftLaw, rightLaw);
     case "*":
       if (left.type === "number") {
@@ -187,7 +262,7 @@ function evaluateExpression(
           operand.paths.map((path) => path.map((value) => -value)),
           `${operand.randomnessHandle}:neg`,
           operand.stats,
-          operand.endpointLaw ? transformEndpointLaw(operand.endpointLaw, (value) => -value) : undefined,
+          operand.endpointLaw ? affineEndpointLaw(operand.endpointLaw, -1, 0) : undefined,
         );
       }
 
@@ -310,14 +385,8 @@ function evaluateExpression(
           ),
           `${processArg.randomnessHandle}:builtin:${node.callee}`,
           undefined,
-          processArgs.length === 1 && processArg.endpointLaw
-            ? transformEndpointLaw(processArg.endpointLaw, (value) =>
-                fn(
-                  ...evaluatedArgs.map((argumentValue) =>
-                    argumentValue.type === "number" ? argumentValue.value : value,
-                  ),
-                ),
-              )
+          processArgs.length === 1
+            ? scalarBuiltinEndpointLaw(node.callee, processArg.endpointLaw)
             : undefined,
         );
       }

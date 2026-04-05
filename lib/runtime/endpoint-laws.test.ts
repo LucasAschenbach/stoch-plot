@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { normalPdf } from "@/lib/runtime/math";
 import {
   affineEndpointLaw,
   normalEndpointLaw,
@@ -7,23 +8,29 @@ import {
 } from "@/lib/runtime/endpoint-laws";
 import {
   densityGrid,
-  estimateLawRange,
   integrateTrapezoid,
 } from "@/lib/runtime/test-helpers";
-import type { EndpointLaw } from "@/lib/runtime/types";
 
-function densityGridForLaw(
-  law: EndpointLaw,
-  fallbackMin: number,
-  fallbackMax: number,
-  padding = 0.5,
-) {
-  const estimated = estimateLawRange(law, { min: fallbackMin, max: fallbackMax });
-  const min = law.support?.min ?? estimated.min;
-  const max = law.support?.max ?? estimated.max;
-  const span = Math.max(max - min + padding * 2, 1);
-  const count = Math.min(60001, Math.max(6001, Math.ceil(span * 400)));
-  return densityGrid(min - padding, max + padding, count);
+function squaredNormalPdf(value: number, stdDev = 1) {
+  if (value <= 0) {
+    return 0;
+  }
+
+  const root = Math.sqrt(value);
+  return (normalPdf(root, 0, stdDev) + normalPdf(-root, 0, stdDev)) / (2 * root);
+}
+
+function scaledSquaredNormalPdf(value: number, scale: number) {
+  if (Math.abs(scale) <= 1e-12) {
+    return 0;
+  }
+
+  const sourceValue = value / scale;
+  if (sourceValue <= 0) {
+    return 0;
+  }
+
+  return squaredNormalPdf(sourceValue) / Math.abs(scale);
 }
 
 describe("endpoint laws", () => {
@@ -38,24 +45,36 @@ describe("endpoint laws", () => {
 
   it("square transforms preserve nonnegative support and unit mass", () => {
     const law = powerEndpointLaw(normalEndpointLaw("z", 0, 1), 2);
-    const y = densityGridForLaw(law, -3, 12);
+    const y = densityGrid(1e-4, 12, 4001);
     const density = law.density(y);
-    const area = integrateTrapezoid(y, density);
+    const expected = y.map((value) => squaredNormalPdf(value));
 
-    expect(Math.max(...density.filter((_value, index) => y[index] < 0))).toBe(0);
-    expect(area, `maxDensity=${Math.max(...density)}`).toBeCloseTo(1, 2);
+    expect(density.every((value) => Number.isFinite(value) && value >= 0)).toBe(true);
+    expect(integrateTrapezoid(y, density)).toBeCloseTo(integrateTrapezoid(y, expected), 9);
     expect(law.expectation()).toBeCloseTo(1, 1);
+  });
+
+  it("square transforms match the exact chi-square density away from the singularity", () => {
+    const law = powerEndpointLaw(normalEndpointLaw("z", 0, 1), 2);
+    const y = densityGrid(1e-4, 12, 4001);
+    const density = law.density(y);
+    const expected = y.map((value) => squaredNormalPdf(value));
+    const maxError = Math.max(
+      ...density.map((value, index) => Math.abs(value - expected[index])),
+    );
+
+    expect(maxError).toBeLessThan(1e-9);
   });
 
   it("negative affine scaling flips support without losing mass", () => {
     const squared = powerEndpointLaw(normalEndpointLaw("z", 0, 1), 2);
     const law = affineEndpointLaw(squared, -3, 0);
-    const y = densityGridForLaw(law, -120, 5);
+    const y = densityGrid(-36, -1e-4, 4001);
     const density = law.density(y);
-    const area = integrateTrapezoid(y, density);
+    const expected = y.map((value) => scaledSquaredNormalPdf(value, -3));
 
-    expect(Math.max(...density.filter((_value, index) => y[index] > 0))).toBe(0);
-    expect(area, `maxDensity=${Math.max(...density)}`).toBeCloseTo(1, 2);
+    expect(density.every((value) => Number.isFinite(value) && value >= 0)).toBe(true);
+    expect(integrateTrapezoid(y, density)).toBeCloseTo(integrateTrapezoid(y, expected), 9);
     expect(law.expectation()).toBeCloseTo(-3, 1);
   });
 });

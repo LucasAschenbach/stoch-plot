@@ -14,6 +14,7 @@ import type {
 const MAX_COMBINATIONS = 40000;
 const CONTINUOUS_POINTS = 121;
 const SUPPORT_EPSILON = 1e-9;
+const DENSITY_AVERAGE_SUBSAMPLES = 64;
 
 function normalizeWeights(weights: number[]) {
   const total = weights.reduce((sum, value) => sum + value, 0);
@@ -44,6 +45,7 @@ type WeightedSamples = {
 
 type EndpointLawOptions = {
   support?: EndpointLawSupport;
+  densityAt?: (value: number) => number;
 };
 
 function clampSupportValue(value?: number) {
@@ -330,6 +332,101 @@ function densityFromWeightedSamples(
   });
 }
 
+function averageDensityAcrossInterval(
+  densityAt: (value: number) => number,
+  left: number,
+  right: number,
+  support?: EndpointLawSupport,
+) {
+  const intervalLeft = Math.max(left, support?.min ?? Number.NEGATIVE_INFINITY);
+  const intervalRight = Math.min(right, support?.max ?? Number.POSITIVE_INFINITY);
+  const width = intervalRight - intervalLeft;
+  if (!(width > 0)) {
+    return 0;
+  }
+
+  let total = 0;
+  for (let sampleIndex = 0; sampleIndex < DENSITY_AVERAGE_SUBSAMPLES; sampleIndex += 1) {
+    const position = (sampleIndex + 0.5) / DENSITY_AVERAGE_SUBSAMPLES;
+    const sample = intervalLeft + position * width;
+    const density = densityAt(sample);
+    total += Number.isFinite(density) ? Math.max(density, 0) : 0;
+  }
+
+  return total / DENSITY_AVERAGE_SUBSAMPLES;
+}
+
+function singularDensitySample(
+  densityAt: (value: number) => number,
+  yGrid: number[],
+  index: number,
+  finiteDensities: number[],
+  support?: EndpointLawSupport,
+) {
+  if (yGrid.length === 1) {
+    return 0;
+  }
+
+  if (index === 0) {
+    const right = yGrid[1];
+    const averageDensity = averageDensityAcrossInterval(densityAt, yGrid[0], right, support);
+    return Math.max(2 * averageDensity - finiteDensities[1], 0);
+  }
+
+  if (index === yGrid.length - 1) {
+    const left = yGrid[index - 1];
+    const averageDensity = averageDensityAcrossInterval(densityAt, left, yGrid[index], support);
+    return Math.max(2 * averageDensity - finiteDensities[index - 1], 0);
+  }
+
+  const left = yGrid[index - 1];
+  const right = yGrid[index + 1];
+  const hLeft = yGrid[index] - left;
+  const hRight = right - yGrid[index];
+  const localAverageDensity = averageDensityAcrossInterval(densityAt, left, right, support);
+  const localMass = localAverageDensity * (right - left);
+
+  return Math.max(
+    (localMass - 0.5 * hLeft * finiteDensities[index - 1] - 0.5 * hRight * finiteDensities[index + 1]) /
+      (0.5 * (hLeft + hRight)),
+    0,
+  );
+}
+
+function positiveIntegerPowerDensityAt(law: EndpointLaw, exponent: number) {
+  if (!law.densityAt || exponent <= 0 || Math.round(exponent) !== exponent) {
+    return undefined;
+  }
+
+  if (exponent === 1) {
+    return law.densityAt;
+  }
+
+  return (value: number) => {
+    if (exponent % 2 === 0 && value < 0) {
+      return 0;
+    }
+
+    if (value === 0) {
+      const densityAtZero = law.densityAt?.(0) ?? 0;
+      return densityAtZero > 0 ? Number.POSITIVE_INFINITY : 0;
+    }
+
+    const rootMagnitude = Math.abs(value) ** (1 / exponent);
+    const jacobian = exponent * rootMagnitude ** (exponent - 1);
+    if (!(jacobian > 0)) {
+      return 0;
+    }
+
+    if (exponent % 2 === 0) {
+      return ((law.densityAt?.(rootMagnitude) ?? 0) + (law.densityAt?.(-rootMagnitude) ?? 0)) / jacobian;
+    }
+
+    const root = value < 0 ? -rootMagnitude : rootMagnitude;
+    return (law.densityAt?.(root) ?? 0) / jacobian;
+  };
+}
+
 function dedupeVariables(variables: EndpointLawVariable[]) {
   const byKey = new Map<string, EndpointLawVariable>();
   variables.forEach((variable) => {
@@ -347,6 +444,7 @@ export function createEndpointLaw(
 ): EndpointLaw {
   const mergedVariables = dedupeVariables(variables);
   const support = normalizeSupport(options.support);
+  const densityAt = options.densityAt;
   let cachedSamples: WeightedSamples | null | undefined;
   let cachedExpectation: number | undefined;
 
@@ -368,6 +466,7 @@ export function createEndpointLaw(
     variables: mergedVariables,
     support,
     evaluate,
+    densityAt,
     expectation: () => {
       if (cachedExpectation !== undefined) {
         return cachedExpectation;
@@ -383,6 +482,27 @@ export function createEndpointLaw(
       return cachedExpectation;
     },
     density: (yGrid) => {
+      if (densityAt) {
+        const resolved = yGrid.map((value) => {
+          if (!inSupport(value, support)) {
+            return 0;
+          }
+
+          const pointDensity = densityAt(value);
+          if (Number.isFinite(pointDensity)) {
+            return Math.max(pointDensity, 0);
+          }
+
+          return Number.NaN;
+        });
+
+        return resolved.map((value, index) =>
+          Number.isFinite(value)
+            ? value
+            : singularDensitySample(densityAt, yGrid, index, resolved, support),
+        );
+      }
+
       const samples = getSamples();
       if (!samples) {
         return yGrid.map(() => 0);
@@ -421,7 +541,9 @@ export function normalEndpointLaw(
   const weights = values.map((value) => normalPdf(value, meanValue, stdDev) * step);
 
   const variable = createVariable(key, label, values, weights);
-  return createEndpointLaw([variable], (environment) => environment[key]);
+  return createEndpointLaw([variable], (environment) => environment[key], {
+    densityAt: (value) => normalPdf(value, meanValue, stdDev),
+  });
 }
 
 export function logNormalEndpointLaw(
@@ -443,6 +565,7 @@ export function logNormalEndpointLaw(
   const variable = createVariable(key, label, values, weights);
   return createEndpointLaw([variable], (environment) => environment[key], {
     support: { min: 0 },
+    densityAt: (value) => logNormalPdf(value, logMean, logStd),
   });
 }
 
@@ -493,13 +616,58 @@ export function transformEndpointLaw(
   );
 }
 
+export function monotoneTransformEndpointLaw(
+  law: EndpointLaw,
+  transform: (value: number) => number,
+  inverse: (value: number) => number,
+  inverseDerivativeMagnitude: (value: number) => number,
+  options: EndpointLawOptions = {},
+) {
+  return transformEndpointLaw(law, transform, {
+    ...options,
+    densityAt: law.densityAt
+      ? (value) => {
+          if (!inSupport(value, options.support)) {
+            return 0;
+          }
+
+          const sourceValue = inverse(value);
+          if (!Number.isFinite(sourceValue) || !inSupport(sourceValue, law.support)) {
+            return 0;
+          }
+
+          const sourceDensity = law.densityAt(sourceValue);
+          const jacobian = inverseDerivativeMagnitude(value);
+          if (!Number.isFinite(sourceDensity) || !Number.isFinite(jacobian)) {
+            return 0;
+          }
+
+          return sourceDensity * Math.max(jacobian, 0);
+        }
+      : options.densityAt,
+  });
+}
+
 export function affineEndpointLaw(
   law: EndpointLaw,
   scale: number,
   offset: number,
 ) {
+  if (Math.abs(scale) <= 1e-12) {
+    return constantEndpointLaw(offset);
+  }
+
   return transformEndpointLaw(law, (value) => offset + scale * value, {
     support: affineSupport(law.support, scale, offset),
+    densityAt: law.densityAt
+      ? (value) => {
+          const sourceValue = (value - offset) / scale;
+          if (!Number.isFinite(sourceValue) || !inSupport(sourceValue, law.support)) {
+            return 0;
+          }
+          return law.densityAt(sourceValue) / Math.abs(scale);
+        }
+      : undefined,
   });
 }
 
@@ -527,6 +695,10 @@ export function powerEndpointLaw(law: EndpointLaw, exponent: number) {
     support: isIntegerExponent
       ? integerPowerSupport(law.support, roundedExponent)
       : undefined,
+    densityAt:
+      isIntegerExponent && roundedExponent > 0
+        ? positiveIntegerPowerDensityAt(law, roundedExponent)
+        : undefined,
   });
 }
 

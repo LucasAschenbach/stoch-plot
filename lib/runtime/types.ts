@@ -119,6 +119,7 @@ export type EndpointLaw = {
   support?: EndpointLawSupport;
   evaluate: (environment: Record<string, number>) => number;
   expectation: () => number;
+  densityAt?: (value: number) => number;
   density: (yGrid: number[]) => number[];
 };
 
