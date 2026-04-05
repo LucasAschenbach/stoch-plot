@@ -78,6 +78,14 @@ pnpm test
 pnpm build
 ```
 
+## GitHub Pages
+
+The repository includes a GitHub Actions workflow at [`.github/workflows/deploy-pages.yml`](/Users/lucasaschenbach/Projects/Mini-Projects/stochastic-plotter/.github/workflows/deploy-pages.yml) that exports the app as static files and deploys them to GitHub Pages on every push to `main`.
+
+For a standard project site, no extra config is needed: the build infers the Pages base path from the repository name automatically. If you later move this site onto a custom domain or a user/org Pages root, set `NEXT_BASE_PATH` to an empty string in the workflow or repository environment.
+
+In GitHub, make sure Pages is configured to deploy from `GitHub Actions` under Settings > Pages.
+
 ## Stack
 
 - Next.js App Router for the application shell

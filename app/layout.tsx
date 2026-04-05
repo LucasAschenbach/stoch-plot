@@ -3,6 +3,14 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
+const repoName = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? ""
+const defaultBasePath =
+  process.env.GITHUB_ACTIONS === "true" && repoName && !repoName.endsWith(".github.io")
+    ? `/${repoName}`
+    : ""
+const basePath = process.env.NEXT_BASE_PATH ?? defaultBasePath
+const withBasePath = (path: string) => `${basePath}${path}`
+
 const geist = Geist({
   subsets: ["latin"],
   variable: "--font-geist",
@@ -19,19 +27,19 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
+        url: withBasePath('/icon-light-32x32.png'),
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/icon-dark-32x32.png',
+        url: withBasePath('/icon-dark-32x32.png'),
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/icon.svg',
+        url: withBasePath('/icon.svg'),
         type: 'image/svg+xml',
       },
     ],
-    apple: '/apple-icon.png',
+    apple: withBasePath('/apple-icon.png'),
   },
 }
 
