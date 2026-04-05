@@ -14,6 +14,7 @@ import {
 import { getGaussianMatrix, getUniformMatrix } from "@/lib/runtime/rng";
 import type {
   ProcessDefinition,
+  ProcessInterpolation,
   ProcessSamplerContext,
   SampledProcess,
 } from "@/lib/runtime/types";
@@ -32,11 +33,24 @@ function cumulative(matrix: number[][], transform: (value: number, dt: number) =
 
 function withStatistics(
   processName: string,
-  output: Omit<SampledProcess, "type" | "processName">,
+  output: Omit<
+    SampledProcess,
+    "type" | "processName" | "increments" | "interpolation"
+  > & {
+    increments?: number[][];
+    interpolation?: ProcessInterpolation;
+  },
   stats?: SampledProcess["stats"],
 ): Omit<SampledProcess, "type" | "processName"> {
   return {
     ...output,
+    increments:
+      (output.increments?.length ?? 0) > 0
+        ? output.increments
+        : output.paths.map((path) =>
+            path.slice(1).map((value, index) => value - (path[index] ?? 0)),
+          ),
+    interpolation: output.interpolation ?? "linear",
     mean: output.mean.length ? output.mean : meanByIndex(output.paths),
     variance: output.variance.length ? output.variance : varianceByIndex(output.paths),
     endpoints:
@@ -94,6 +108,10 @@ const definitions: ProcessDefinition[] = [
         {
           times: context.times,
           paths,
+          increments: paths.map((path) =>
+            path.slice(1).map((value, index) => value - (path[index] ?? 0)),
+          ),
+          interpolation: "linear",
           mean: [],
           variance: [],
           endpoints: [],
@@ -146,6 +164,10 @@ const definitions: ProcessDefinition[] = [
         {
           times: context.times,
           paths: bridge,
+          increments: bridge.map((path) =>
+            path.slice(1).map((value, index) => value - (path[index] ?? 0)),
+          ),
+          interpolation: "linear",
           mean: [],
           variance: [],
           endpoints: [],
@@ -202,6 +224,10 @@ const definitions: ProcessDefinition[] = [
         {
           times: context.times,
           paths,
+          increments: paths.map((path) =>
+            path.slice(1).map((value, index) => value - (path[index] ?? 0)),
+          ),
+          interpolation: "linear",
           mean: [],
           variance: [],
           endpoints: [],
@@ -274,6 +300,10 @@ const definitions: ProcessDefinition[] = [
         {
           times: context.times,
           paths,
+          increments: paths.map((path) =>
+            path.slice(1).map((value, index) => value - (path[index] ?? 0)),
+          ),
+          interpolation: "linear",
           mean: [],
           variance: [],
           endpoints: [],
@@ -324,6 +354,10 @@ const definitions: ProcessDefinition[] = [
         {
           times: context.times,
           paths,
+          increments: paths.map((path) =>
+            path.slice(1).map((value, index) => value - (path[index] ?? 0)),
+          ),
+          interpolation: "step",
           mean: [],
           variance: [],
           endpoints: [],
@@ -370,6 +404,10 @@ const definitions: ProcessDefinition[] = [
         {
           times: context.times,
           paths,
+          increments: paths.map((path) =>
+            path.slice(1).map((value, index) => value - (path[index] ?? 0)),
+          ),
+          interpolation: "step",
           mean: [],
           variance: [],
           endpoints: [],

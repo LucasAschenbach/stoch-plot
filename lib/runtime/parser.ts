@@ -3,6 +3,7 @@ import type {
   CompiledCell,
   CompiledCellKind,
   Diagnostic,
+  DifferentialIdentifierName,
   ExpressionNode,
   NotebookCell,
   ParsedAssignment,
@@ -22,7 +23,10 @@ const BUILTIN_PROCESS_NAMES = new Set([
 type Token =
   | { type: "number"; value: number }
   | { type: "identifier"; value: string }
-  | { type: "operator"; value: BinaryOperator | "=" | "," | "(" | ")" }
+  | {
+      type: "operator";
+      value: BinaryOperator | "=" | "," | "(" | ")" | "[" | "]";
+    }
   | { type: "eof" };
 
 type OperatorTokenValue = Extract<Token, { type: "operator" }>["value"];
@@ -34,6 +38,13 @@ const PRECEDENCE: Record<BinaryOperator, number> = {
   "/": 2,
   "^": 3,
 };
+
+function normalizeTimeChangeSugar(input: string) {
+  return input.replace(
+    /\b([A-Za-z][A-Za-z0-9]*)_\{([^{}]+)\}/g,
+    (_match, baseName: string, clockSource: string) => `${baseName}_t[${clockSource}]`,
+  );
+}
 
 function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
@@ -71,7 +82,7 @@ function tokenize(input: string): Token[] {
       continue;
     }
 
-    if ("+-*/^=(),".includes(char)) {
+    if ("+-*/^=(),[]".includes(char)) {
       tokens.push({ type: "operator", value: char as OperatorTokenValue });
       index += 1;
       continue;
@@ -84,11 +95,31 @@ function tokenize(input: string): Token[] {
   return tokens;
 }
 
+function initialConditionProcessName(name: string) {
+  const match = name.match(/^([A-Za-z][A-Za-z0-9]*)_0$/);
+  return match ? `${match[1]}_t` : null;
+}
+
+function sdeProcessName(name: string) {
+  const match = name.match(/^d([A-Za-z][A-Za-z0-9]*)_t$/);
+  return match ? `${match[1]}_t` : null;
+}
+
+function differentialProcessName(name: DifferentialIdentifierName) {
+  if (name === "dt") {
+    return null;
+  }
+
+  return `${name.slice(1)}`;
+}
+
 class Parser {
   constructor(private readonly tokens: Token[], private index = 0) {}
 
   parseAssignment(): ParsedAssignment {
     const name = this.expectIdentifier();
+    const maybeInitialCondition = initialConditionProcessName(name);
+    const maybeSdeProcessName = sdeProcessName(name);
 
     if (this.matchOperator("(")) {
       const parameter = this.expectIdentifier();
@@ -104,6 +135,26 @@ class Parser {
     }
 
     this.expectOperator("=");
+
+    if (maybeSdeProcessName) {
+      return {
+        type: "sde",
+        name: maybeSdeProcessName,
+        processName: maybeSdeProcessName,
+        initialConditionName: maybeSdeProcessName.replace(/_t$/, "_0"),
+        expression: this.parseExpression(),
+      };
+    }
+
+    if (maybeInitialCondition) {
+      return {
+        type: "initialCondition",
+        name,
+        processName: maybeInitialCondition,
+        expression: this.parseExpression(),
+      };
+    }
+
     return {
       type: "assignment",
       name,
@@ -115,9 +166,20 @@ class Parser {
     let left = this.parsePrefix();
 
     while (true) {
+      if (this.matchOperator("[")) {
+        const clock = this.parseExpression();
+        this.expectOperator("]");
+        left = {
+          type: "timeChange",
+          process: left,
+          clock,
+        };
+        continue;
+      }
+
       const operator = this.peekOperator();
 
-      if (!operator || operator === "=" || operator === "," || operator === ")") {
+      if (!operator || operator === "=" || operator === "," || operator === ")" || operator === "]") {
         break;
       }
 
@@ -160,6 +222,17 @@ class Parser {
 
     if (token.type === "identifier") {
       this.consume();
+
+      if (token.value === "t") {
+        return { type: "time" };
+      }
+
+      if (token.value === "dt" || /^d[A-Za-z][A-Za-z0-9]*_t$/.test(token.value)) {
+        return {
+          type: "differentialIdentifier",
+          name: token.value as DifferentialIdentifierName,
+        };
+      }
 
       if (this.matchOperator("(")) {
         const args: ExpressionNode[] = [];
@@ -241,26 +314,47 @@ class Parser {
 function collectDependencies(
   node: ExpressionNode,
   parameterName?: string,
+  localProcessName?: string,
   dependencies = new Set<string>(),
 ) {
   switch (node.type) {
     case "identifier":
-      if (node.name !== parameterName) {
+      if (node.name !== parameterName && node.name !== localProcessName) {
         dependencies.add(node.name);
       }
       return dependencies;
+    case "time":
+      return dependencies;
+    case "differentialIdentifier": {
+      const dependency = differentialProcessName(node.name);
+      if (dependency && dependency !== localProcessName) {
+        dependencies.add(dependency);
+      }
+      return dependencies;
+    }
     case "binary":
-      collectDependencies(node.left, parameterName, dependencies);
-      collectDependencies(node.right, parameterName, dependencies);
+      collectDependencies(node.left, parameterName, localProcessName, dependencies);
+      collectDependencies(node.right, parameterName, localProcessName, dependencies);
       return dependencies;
     case "unary":
-      collectDependencies(node.operand, parameterName, dependencies);
+      collectDependencies(node.operand, parameterName, localProcessName, dependencies);
       return dependencies;
     case "call":
-      if (!(node.callee in SCALAR_FUNCTIONS) && !BUILTIN_PROCESS_NAMES.has(node.callee)) {
+      if (
+        !(node.callee in SCALAR_FUNCTIONS) &&
+        !BUILTIN_PROCESS_NAMES.has(node.callee) &&
+        node.callee !== "integral" &&
+        node.callee !== "qv"
+      ) {
         dependencies.add(node.callee);
       }
-      node.args.forEach((arg) => collectDependencies(arg, parameterName, dependencies));
+      node.args.forEach((arg) =>
+        collectDependencies(arg, parameterName, localProcessName, dependencies),
+      );
+      return dependencies;
+    case "timeChange":
+      collectDependencies(node.process, parameterName, localProcessName, dependencies);
+      collectDependencies(node.clock, parameterName, localProcessName, dependencies);
       return dependencies;
     default:
       return dependencies;
@@ -270,6 +364,14 @@ function collectDependencies(
 function classifyKind(assignment: ParsedAssignment): CompiledCellKind {
   if (assignment.type === "function") {
     return "function";
+  }
+
+  if (assignment.type === "sde") {
+    return "sde";
+  }
+
+  if (assignment.type === "initialCondition") {
+    return "constant";
   }
 
   if (assignment.name.endsWith("_t")) {
@@ -290,9 +392,9 @@ export function parseCellSource(source: string) {
     throw new Error("Cell is empty");
   }
 
-  const parser = new Parser(tokenize(trimmed));
-  const assignment = parser.parseAssignment();
-  return assignment;
+  const normalized = normalizeTimeChangeSugar(trimmed);
+  const parser = new Parser(tokenize(normalized));
+  return parser.parseAssignment();
 }
 
 export function compileCells(cells: NotebookCell[]) {
@@ -307,8 +409,13 @@ export function compileCells(cells: NotebookCell[]) {
         collectDependencies(
           assignment.expression,
           assignment.type === "function" ? assignment.parameter : undefined,
+          assignment.type === "sde" ? assignment.processName : undefined,
         ),
       ).filter((dependency) => dependency !== assignment.name);
+
+      if (assignment.type === "sde") {
+        dependencies.push(assignment.initialConditionName);
+      }
 
       const compiledCell: CompiledCell = {
         id: cell.id,
@@ -316,7 +423,7 @@ export function compileCells(cells: NotebookCell[]) {
         name: assignment.name,
         assignment,
         kind: classifyKind(assignment),
-        dependencies,
+        dependencies: Array.from(new Set(dependencies)),
       };
 
       compiled.set(cell.id, compiledCell);
@@ -397,15 +504,33 @@ export function inferExpressionType(
         return "number";
       }
       return getType(node.name) ?? "number";
+    case "time":
+      return parameterName === "t" ? "number" : "process";
+    case "differentialIdentifier":
+      return "differential";
     case "unary":
       return inferExpressionType(node.operand, getType, parameterName);
     case "binary": {
       const left = inferExpressionType(node.left, getType, parameterName);
       const right = inferExpressionType(node.right, getType, parameterName);
+
+      if (left === "differential" || right === "differential") {
+        return "differential";
+      }
+
       return left === "process" || right === "process" ? "process" : "number";
     }
     case "call": {
       const calleeType = getType(node.callee);
+
+      if (node.callee === "integral") {
+        return "process";
+      }
+
+      if (node.callee === "qv") {
+        return "process";
+      }
+
       if (calleeType === "function") {
         const firstArgType = node.args[0]
           ? inferExpressionType(node.args[0], getType, parameterName)
@@ -413,25 +538,20 @@ export function inferExpressionType(
         return firstArgType === "process" ? "process" : "number";
       }
 
-      if (
-        node.callee === "Brownian" ||
-        node.callee === "BrownianBridge" ||
-        node.callee === "GeometricBrownian" ||
-        node.callee === "OrnsteinUhlenbeck" ||
-        node.callee === "Poisson" ||
-        node.callee === "RandomWalk"
-      ) {
+      if (BUILTIN_PROCESS_NAMES.has(node.callee)) {
         return "process";
       }
 
       if (node.callee in SCALAR_FUNCTIONS) {
-        const firstArgType = node.args[0]
-          ? inferExpressionType(node.args[0], getType, parameterName)
-          : "number";
-        return firstArgType === "process" ? "process" : "number";
+        const argTypes = node.args.map((arg) =>
+          inferExpressionType(arg, getType, parameterName),
+        );
+        return argTypes.includes("process") ? "process" : "number";
       }
 
       return "number";
     }
+    case "timeChange":
+      return "process";
   }
 }

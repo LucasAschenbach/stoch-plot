@@ -84,7 +84,7 @@ function DocsModalContent() {
       <DialogHeader>
         <DialogTitle>Notebook Reference</DialogTitle>
         <DialogDescription>
-          Supported syntax for constants, scalar functions, and stochastic processes.
+          Supported syntax for constants, scalar functions, stochastic processes, and Itô-style SDEs.
         </DialogDescription>
       </DialogHeader>
       <ScrollArea className="h-[50vh] pr-4">
@@ -93,9 +93,11 @@ function DocsModalContent() {
             <h3 className="font-semibold mb-2">Assignments</h3>
             <div className="space-y-1 text-muted-foreground">
               <p><code className="bg-muted px-1 rounded">mu = 0.12</code> defines a numeric constant.</p>
+              <p><code className="bg-muted px-1 rounded">X_0 = 1</code> defines an initial condition for <code className="bg-muted px-1 rounded">X_t</code>.</p>
               <p><code className="bg-muted px-1 rounded">f(t) = t^2</code> defines a scalar function of one variable.</p>
               <p><code className="bg-muted px-1 rounded">B_t = Brownian()</code> defines a stochastic process.</p>
               <p><code className="bg-muted px-1 rounded">Y_t = exp(mu * t + sigma * B_t)</code> defines a derived process.</p>
+              <p><code className="bg-muted px-1 rounded">dX_t = mu(t, X_t) * dt + sigma(t, X_t) * dB_t</code> defines an Itô SDE.</p>
             </div>
           </section>
 
@@ -131,9 +133,20 @@ function DocsModalContent() {
           </section>
 
           <section>
+            <h3 className="font-semibold mb-2">Stochastic Calculus</h3>
+            <div className="space-y-1 text-muted-foreground">
+              <p><code className="bg-muted px-1 rounded">integral(X_t * dt)</code> builds a cumulative time integral.</p>
+              <p><code className="bg-muted px-1 rounded">integral(sigma(t, X_t) * dB_t)</code> builds an Itô integral on the current grid.</p>
+              <p><code className="bg-muted px-1 rounded">qv(B_t)</code> and <code className="bg-muted px-1 rounded">qv(X_t, Y_t)</code> build quadratic variation and covariation.</p>
+              <p><code className="bg-muted px-1 rounded">B_t[f(t)]</code> and <code className="bg-muted px-1 rounded">{"B_{f(t)}"}</code> apply monotone time changes.</p>
+            </div>
+          </section>
+
+          <section>
             <h3 className="font-semibold mb-2">Notes</h3>
             <ul className="list-disc list-inside space-y-1 text-muted-foreground">
               <li>Process cells should use names ending in <code className="bg-muted px-1 rounded">_t</code>.</li>
+              <li><code className="bg-muted px-1 rounded">dt</code> and <code className="bg-muted px-1 rounded">dX_t</code> are only valid inside <code className="bg-muted px-1 rounded">integral(...)</code> or on the right-hand side of <code className="bg-muted px-1 rounded">dY_t = ...</code>.</li>
               <li>Constants can be adjusted with the inline slider controls shown on constant cells.</li>
               <li>The histogram panel shows endpoint histograms and analytic endpoint densities when available.</li>
             </ul>

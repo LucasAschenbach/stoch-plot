@@ -1,8 +1,10 @@
-export type RuntimeValueType = "number" | "function" | "process";
+export type RuntimeValueType = "number" | "function" | "process" | "differential";
 
 export type BinaryOperator = "+" | "-" | "*" | "/" | "^";
 
 export type UnaryOperator = "-";
+
+export type DifferentialIdentifierName = "dt" | `d${string}_t`;
 
 export type ExpressionNode =
   | {
@@ -12,6 +14,13 @@ export type ExpressionNode =
   | {
       type: "identifier";
       name: string;
+    }
+  | {
+      type: "time";
+    }
+  | {
+      type: "differentialIdentifier";
+      name: DifferentialIdentifierName;
     }
   | {
       type: "binary";
@@ -28,6 +37,11 @@ export type ExpressionNode =
       type: "call";
       callee: string;
       args: ExpressionNode[];
+    }
+  | {
+      type: "timeChange";
+      process: ExpressionNode;
+      clock: ExpressionNode;
     };
 
 export type ParsedAssignment =
@@ -40,6 +54,19 @@ export type ParsedAssignment =
       type: "function";
       name: string;
       parameter: string;
+      expression: ExpressionNode;
+    }
+  | {
+      type: "initialCondition";
+      name: string;
+      processName: string;
+      expression: ExpressionNode;
+    }
+  | {
+      type: "sde";
+      name: string;
+      processName: string;
+      initialConditionName: string;
       expression: ExpressionNode;
     };
 
@@ -76,7 +103,12 @@ export type NotebookCell = {
   slider: SliderConfig;
 };
 
-export type CompiledCellKind = "constant" | "function" | "process" | "derived";
+export type CompiledCellKind =
+  | "constant"
+  | "function"
+  | "process"
+  | "derived"
+  | "sde";
 
 export type CompiledCell = {
   id: string;
@@ -130,11 +162,15 @@ export type ProcessStatsProvider = {
   endpointDensity?: (y: number[], time: number) => number[];
 };
 
+export type ProcessInterpolation = "linear" | "step";
+
 export type SampledProcess = {
   type: "process";
   processName: string;
   times: number[];
   paths: number[][];
+  increments: number[][];
+  interpolation: ProcessInterpolation;
   mean: number[];
   variance: number[];
   endpoints: number[];
@@ -142,14 +178,6 @@ export type SampledProcess = {
   stats?: ProcessStatsProvider;
   endpointLaw?: EndpointLaw;
 };
-
-export type RuntimeValue =
-  | {
-      type: "number";
-      value: number;
-    }
-  | ScalarFunctionValue
-  | SampledProcess;
 
 export type ProcessSamplerContext = {
   cellId: string;
@@ -160,13 +188,61 @@ export type ProcessSamplerContext = {
   rng: RngContext;
 };
 
+export type MaterializeProcessContext = ProcessSamplerContext & {
+  cache: Map<string, SampledProcess>;
+};
+
+export type ProcessModelValue = {
+  type: "process";
+  processName: string;
+  modelId: string;
+  interpolation: ProcessInterpolation;
+  materialize: (context: MaterializeProcessContext) => SampledProcess;
+};
+
+export type DifferentialTerm = {
+  atom: "dt" | string;
+  coefficient: SymbolValue;
+};
+
+export type DifferentialValue = {
+  type: "differential";
+  terms: DifferentialTerm[];
+};
+
+export type RuntimeValue =
+  | {
+      type: "number";
+      value: number;
+    }
+  | ScalarFunctionValue
+  | SampledProcess;
+
+export type SymbolValue =
+  | {
+      type: "number";
+      value: number;
+    }
+  | ScalarFunctionValue
+  | ProcessModelValue
+  | DifferentialValue;
+
 export type ProcessDefinition = {
   name: string;
   parameters: string[];
   sample: (
     args: number[],
     context: ProcessSamplerContext,
-  ) => Omit<SampledProcess, "type" | "processName">;
+  ) => Omit<
+    SampledProcess,
+    | "type"
+    | "processName"
+    | "increments"
+    | "interpolation"
+  > & {
+    increments?: number[][];
+    interpolation?: ProcessInterpolation;
+  };
   stats?: (args: number[], times: number[], tMax: number) => ProcessStatsProvider;
 };
 
@@ -181,7 +257,7 @@ export type EvaluationRecord = {
 
 export type NotebookEvaluation = {
   records: Record<string, EvaluationRecord>;
-  symbolTable: Record<string, RuntimeValue>;
+  symbolTable: Record<string, SymbolValue>;
   orderedCellIds: string[];
 };
 

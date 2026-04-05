@@ -5,6 +5,7 @@ Interactive notebook for stochastic processes built with Next.js, shadcn/ui, and
 ## Features
 
 - Editable notebook cells for constants, scalar functions, built-in stochastic processes, and derived processes
+- Itô-style SDE definitions with `X_0 = ...`, `dX_t = ...`, `integral(...)`, `qv(...)`, and monotone time changes
 - Interactive path plot with pan, zoom, legend hover highlighting, and a toggleable endpoint histogram panel
 - Seeded sampling with persistent notebook state
 - Endpoint-law overlays for supported direct and composite processes
