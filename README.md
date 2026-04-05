@@ -1,6 +1,5 @@
 <div align="center">
   <h1>Stochastic Plotter</h1>
-  <hr/>
   <p>
     <strong>Desmos for Stochastic Processes.</strong><br />
     An interactive notebook for building, sampling, and comparing stochastic models in real time.
