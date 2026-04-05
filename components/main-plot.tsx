@@ -106,6 +106,7 @@ function drawVarianceBand(
   mean: number[],
   variance: number[],
   color: string,
+  alpha: number,
   viewport: ReturnType<typeof useNotebookStore.getState>["viewport"],
   width: number,
   height: number,
@@ -139,11 +140,17 @@ function drawVarianceBand(
   });
 
   context.closePath();
-  context.fillStyle = withAlpha(color, 0.12);
+  context.fillStyle = withAlpha(color, alpha);
   context.fill();
 }
 
-export function MainPlot({ items }: { items: PlotItem[] }) {
+export function MainPlot({
+  items,
+  showRightSeparator = false,
+}: {
+  items: PlotItem[];
+  showRightSeparator?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; mode: InteractionMode } | null>(null);
@@ -249,8 +256,8 @@ export function MainPlot({ items }: { items: PlotItem[] }) {
     context.fillRect(0, 0, size.width, size.height);
 
     const plot = getPlotArea({ width: size.width, height: size.height }, MAIN_PLOT_PADDING);
-    const xTicks = generateTicks(viewport.xMin, viewport.xMax);
-    const yTicks = generateTicks(viewport.yMin, viewport.yMax);
+    const xTicks = generateTicks(viewport.xMin, viewport.xMax, 9);
+    const yTicks = generateTicks(viewport.yMin, viewport.yMax, 9);
 
     context.strokeStyle = border;
     context.lineWidth = 1;
@@ -285,19 +292,17 @@ export function MainPlot({ items }: { items: PlotItem[] }) {
 
       if (value.type === "process") {
         if (cell.display.showVariance) {
-          context.save();
-          context.globalAlpha = dimmed ? 0.06 : emphasis ? 0.2 : 1;
           drawVarianceBand(
             context,
             value.times,
             value.mean,
             value.variance,
             cell.display.color,
+            emphasis ? 0.28 : dimmed ? 0.08 : 0.16,
             viewport,
             size.width,
             size.height,
           );
-          context.restore();
         }
 
         if (cell.display.showPaths) {
@@ -355,32 +360,53 @@ export function MainPlot({ items }: { items: PlotItem[] }) {
     context.lineTo(plot.x, plot.y + plot.height);
     context.stroke();
 
-    context.strokeStyle = foreground;
-    context.lineWidth = 1;
-    context.strokeRect(plot.x, plot.y, plot.width, plot.height);
-
     context.fillStyle = mutedForeground;
-    context.font = "12px sans-serif";
+    context.font = "11px sans-serif";
     context.textAlign = "center";
+    context.textBaseline = "top";
     xTicks.forEach((tick) => {
       const x = worldToScreenX(tick, viewport, { width: size.width, height: size.height }, MAIN_PLOT_PADDING);
-      context.fillText(formatTick(tick), x, size.height - 8);
+      context.beginPath();
+      context.moveTo(x, plot.y + plot.height);
+      context.lineTo(x, plot.y + plot.height + 5);
+      context.strokeStyle = border;
+      context.lineWidth = 1;
+      context.stroke();
+      context.fillText(formatTick(tick), x, plot.y + plot.height + 7);
     });
 
-    context.textAlign = "right";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
     yTicks.forEach((tick) => {
       const y = worldToScreenY(tick, viewport, { width: size.width, height: size.height }, MAIN_PLOT_PADDING);
-      context.fillText(formatTick(tick), plot.x - 8, y + 4);
+      context.beginPath();
+      context.moveTo(plot.x, y);
+      context.lineTo(plot.x - 7, y);
+      context.strokeStyle = border;
+      context.lineWidth = 1;
+      context.stroke();
+      context.save();
+      context.translate(plot.x - 12, y);
+      context.rotate(-Math.PI / 2);
+      context.fillText(formatTick(tick), 0, 0);
+      context.restore();
     });
   }, [chartData, hoveredCellId, hoverMode, size.height, size.width, viewport]);
 
   return (
-    <section className="flex min-w-0 flex-1 border-r border-border bg-background">
+    <section
+      className={`flex min-w-0 flex-1 bg-background ${
+        showRightSeparator ? "border-r border-border/70" : ""
+      }`}
+    >
       <div ref={containerRef} className="relative h-full w-full bg-background">
         {chartData.length > 0 ? (
           <div
-            className="pointer-events-none absolute top-4 z-20 flex max-w-[70%] flex-wrap gap-2"
-            style={{ left: `${MAIN_PLOT_PADDING.left + 12}px` }}
+            className="pointer-events-none absolute z-20 flex max-w-[70%] flex-wrap gap-2"
+            style={{
+              left: `${MAIN_PLOT_PADDING.left + 12}px`,
+              top: `${MAIN_PLOT_PADDING.top + 8}px`,
+            }}
           >
             {chartData.map((item) => {
               const active = hoveredCellId === item.cell.id;

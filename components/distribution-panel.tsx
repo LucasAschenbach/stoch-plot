@@ -69,8 +69,6 @@ export function DistributionPanel({ items }: { items: PlotItem[] }) {
     const styles = getComputedStyle(document.documentElement);
     const background = styles.getPropertyValue("--background").trim() || "#ffffff";
     const border = styles.getPropertyValue("--border").trim() || "#e5e7eb";
-    const foreground = styles.getPropertyValue("--foreground").trim() || "#111827";
-
     context.clearRect(0, 0, size.width, size.height);
     context.fillStyle = background;
     context.fillRect(0, 0, size.width, size.height);
@@ -177,13 +175,10 @@ export function DistributionPanel({ items }: { items: PlotItem[] }) {
       }
     });
 
-    context.strokeStyle = foreground;
-    context.lineWidth = 1;
-    context.strokeRect(plot.x, plot.y, plot.width, plot.height);
   }, [chartData, densityY, hoveredCellId, size.height, size.width, viewport]);
 
   return (
-    <aside className="h-full w-[320px] shrink-0 border-l border-border bg-background">
+    <aside className="h-full w-[320px] shrink-0 border-l border-border/70 bg-background">
       <div ref={containerRef} className="h-full w-full">
         <canvas ref={canvasRef} className="h-full w-full" />
       </div>

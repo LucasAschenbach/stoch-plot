@@ -87,8 +87,11 @@ export function NotebookApp() {
             setGridValue("distributionPanel", !toolbar.distributionPanel)
           }
         />
-        <div className="flex min-h-0 flex-1">
-          <MainPlot items={visibleValues} />
+        <div className={`flex min-h-0 flex-1 ${toolbar.distributionPanel ? "gap-3" : ""}`}>
+          <MainPlot
+            items={visibleValues}
+            showRightSeparator={toolbar.distributionPanel}
+          />
           {toolbar.distributionPanel ? <DistributionPanel items={visibleValues} /> : null}
         </div>
       </div>

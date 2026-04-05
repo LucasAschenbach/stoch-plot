@@ -19,17 +19,17 @@ export type CanvasBounds = {
 };
 
 export const MAIN_PLOT_PADDING: PlotPadding = {
-  top: 12,
-  right: 16,
-  bottom: 28,
-  left: 52,
+  top: 10,
+  right: 0,
+  bottom: 24,
+  left: 28,
 };
 
 export const DIST_PLOT_PADDING: PlotPadding = {
-  top: 12,
-  right: 12,
-  bottom: 28,
-  left: 8,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
 };
 
 function rangeWithPadding(minValue: number, maxValue: number, ratio = 0.12) {
