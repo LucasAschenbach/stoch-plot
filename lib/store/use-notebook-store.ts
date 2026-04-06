@@ -24,7 +24,7 @@ const defaultDisplay = (color: string): CellDisplayOptions => ({
   showVariance: false,
   sampleCount: 24,
   color,
-  colorMode: "viridis",
+  colorMode: "solid",
 });
 
 const defaultSlider = (value = 1): SliderConfig => ({
