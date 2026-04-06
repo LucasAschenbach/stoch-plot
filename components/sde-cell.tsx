@@ -1,5 +1,7 @@
 "use client"
 
+import type { Ref } from "react"
+
 import { Eye, EyeOff, X } from "lucide-react"
 
 import { ColorPicker } from "@/components/color-picker"
@@ -8,6 +10,7 @@ import type { ColorMode } from "@/lib/runtime/types"
 
 interface SDECellProps {
   source: string
+  sourceInputRef?: Ref<HTMLInputElement>
   error?: string
   color: string
   colorMode: ColorMode
@@ -52,6 +55,7 @@ function TogglePill({
 
 export function SDECell({
   source,
+  sourceInputRef,
   error,
   color,
   colorMode,
@@ -74,6 +78,7 @@ export function SDECell({
     <div className="border border-border rounded-lg p-3 bg-card">
       <div className="flex items-start justify-between gap-2">
         <input
+          ref={sourceInputRef}
           value={source}
           onPointerDown={(event) => event.stopPropagation()}
           onChange={(event) => onSourceChange?.(event.target.value)}

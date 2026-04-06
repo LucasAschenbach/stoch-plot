@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   closestCenter,
   DndContext,
@@ -173,6 +173,8 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
   const updateDisplay = useNotebookStore((state) => state.updateDisplay)
   const updateSlider = useNotebookStore((state) => state.updateSlider)
   const removeCell = useNotebookStore((state) => state.removeCell)
+  const sourceInputRef = useRef<HTMLInputElement>(null)
+  const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null)
 
   const fallbackKind = fallbackKindForSource(cell.source)
   const resolvedKind = record?.kind ?? fallbackKind
@@ -188,7 +190,34 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
     resolvedKind === "derived" ||
     record?.value?.type === "process"
   const canHover = isFunction || isProcess
-  const isHovered = hoveredCellId === cell.id
+
+  useLayoutEffect(() => {
+    const pendingSelection = pendingSelectionRef.current
+    const input = sourceInputRef.current
+    if (!pendingSelection || !input) {
+      return
+    }
+
+    input.focus()
+    const nextStart = Math.min(pendingSelection.start, input.value.length)
+    const nextEnd = Math.min(pendingSelection.end, input.value.length)
+    input.setSelectionRange(nextStart, nextEnd)
+    pendingSelectionRef.current = null
+  }, [cell.source, resolvedKind])
+
+  const handleSourceChange = (value: string) => {
+    const input = sourceInputRef.current
+    if (input && document.activeElement === input) {
+      pendingSelectionRef.current = {
+        start: input.selectionStart ?? value.length,
+        end: input.selectionEnd ?? value.length,
+      }
+    } else {
+      pendingSelectionRef.current = null
+    }
+
+    updateCellSource(cell.id, value)
+  }
 
   const wrapperProps = {
     ref: setNodeRef,
@@ -216,13 +245,14 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
       <div {...wrapperProps} {...hoverHandlers} className={`${wrapperProps.className} ${baseClassName}`}>
         <ParameterCell
           source={cell.source}
+          sourceInputRef={sourceInputRef}
           error={record?.error}
           min={cell.slider.min}
           max={cell.slider.max}
           step={cell.slider.step}
           sliderValue={effectiveSliderValue}
           onDelete={() => removeCell(cell.id)}
-          onSourceChange={(value) => updateCellSource(cell.id, value)}
+          onSourceChange={handleSourceChange}
           onSliderValueChange={(value) =>
             updateCellSource(
               cell.id,
@@ -244,13 +274,14 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
       <div {...wrapperProps} {...hoverHandlers} className={`${wrapperProps.className} ${baseClassName}`}>
         <FunctionCell
           source={cell.source}
+          sourceInputRef={sourceInputRef}
           error={record?.error}
           color={cell.display.color}
           colorMode={cell.display.colorMode}
           visible={cell.display.visible}
           onDelete={() => removeCell(cell.id)}
           onToggleVisibility={() => updateDisplay(cell.id, { visible: !cell.display.visible })}
-          onSourceChange={(value) => updateCellSource(cell.id, value)}
+          onSourceChange={handleSourceChange}
           onSelectSolid={(color) => updateDisplay(cell.id, { color, colorMode: "solid" })}
           onSelectScheme={(mode) => updateDisplay(cell.id, processColorPatch(mode, cell.display.color))}
         />
@@ -262,6 +293,7 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
     <div {...wrapperProps} {...hoverHandlers} className={`${wrapperProps.className} ${baseClassName}`}>
       <SDECell
         source={cell.source}
+        sourceInputRef={sourceInputRef}
         error={record?.error}
         color={cell.display.color}
         colorMode={cell.display.colorMode}
@@ -282,7 +314,7 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
             sampleCount: Math.max(1, Math.min(512, Math.round(value))),
           })
         }
-        onSourceChange={(value) => updateCellSource(cell.id, value)}
+        onSourceChange={handleSourceChange}
         onSelectSolid={(color) => updateDisplay(cell.id, { color, colorMode: "solid" })}
         onSelectScheme={(mode) => updateDisplay(cell.id, processColorPatch(mode, cell.display.color))}
       />

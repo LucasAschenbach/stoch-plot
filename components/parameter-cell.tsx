@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type Ref } from "react"
 import { SlidersHorizontal, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider"
 
 interface ParameterCellProps {
   source: string
+  sourceInputRef?: Ref<HTMLInputElement>
   error?: string
   min: number
   max: number
@@ -71,6 +72,7 @@ function SmallNumberInput({
 
 export function ParameterCell({
   source,
+  sourceInputRef,
   error,
   min,
   max,
@@ -87,6 +89,7 @@ export function ParameterCell({
     <div className="border border-border rounded-lg p-3 bg-card">
       <div className="flex items-start justify-between gap-2">
         <input
+          ref={sourceInputRef}
           value={source}
           onPointerDown={(event) => event.stopPropagation()}
           onChange={(event) => onSourceChange?.(event.target.value)}
