@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AlignJustify, Dices, Maximize2 } from "lucide-react"
+import { AlignJustify, Dices, Maximize } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -110,7 +110,7 @@ export function Toolbar({
         className="gap-2"
         onClick={onResetView}
       >
-        <Maximize2 className="size-4" />
+        <Maximize className="size-4" />
         Reset View
       </Button>
 
