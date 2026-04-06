@@ -34,6 +34,25 @@ interface ColorPickerProps {
   onSelectScheme?: (mode: Exclude<ColorMode, "solid">) => void
 }
 
+function ColorSwatch({
+  background,
+  className = "",
+}: {
+  background: string
+  className?: string
+}) {
+  return (
+    <span
+      className={`relative block overflow-hidden rounded-full ring-1 ring-border/50 ${className}`}
+    >
+      <span
+        className="absolute inset-px rounded-full"
+        style={{ background }}
+      />
+    </span>
+  )
+}
+
 export function ColorPicker({
   color,
   colorMode,
@@ -55,14 +74,17 @@ export function ColorPicker({
         <button 
           type="button"
           onPointerDown={(event) => event.stopPropagation()}
-          className="size-5 rounded-full border border-border/50 cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-shadow focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
-          style={{ 
-            background:
+          className="cursor-pointer rounded-full hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-shadow focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+        >
+          <ColorSwatch
+            className="size-5"
+            background={
               colorMode === "solid"
                 ? activeColor
-                : `linear-gradient(90deg, ${activePalette.join(", ")})`,
-          }}
-        />
+                : `linear-gradient(90deg, ${activePalette.join(", ")})`
+            }
+          />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
         {SOLID_COLORS.map((solidColor) => (
@@ -74,10 +96,7 @@ export function ColorPicker({
               setIsOpen(false)
             }}
           >
-            <div
-              className="size-5 rounded-full border border-border/50"
-              style={{ backgroundColor: solidColor }}
-            />
+            <ColorSwatch className="size-5" background={solidColor} />
             <span>{solidColor.toUpperCase()}</span>
           </DropdownMenuItem>
         ))}
@@ -111,11 +130,9 @@ export function ColorPicker({
               setIsOpen(false)
             }}
           >
-            <div 
-              className="size-5 rounded-full border border-border/50"
-              style={{ 
-                background: `linear-gradient(90deg, ${paletteForMode(color, option.value).join(", ")})`
-              }}
+            <ColorSwatch
+              className="size-5"
+              background={`linear-gradient(90deg, ${paletteForMode(color, option.value).join(", ")})`}
             />
             <span>{option.label}</span>
           </DropdownMenuItem>
