@@ -9,7 +9,7 @@ import type {
   ParsedAssignment,
   RuntimeValueType,
 } from "@/lib/runtime/types";
-import { SCALAR_FUNCTIONS } from "@/lib/runtime/math";
+import { BUILTIN_CONSTANTS, SCALAR_FUNCTIONS } from "@/lib/runtime/math";
 
 const BUILTIN_PROCESS_NAMES = new Set([
   "Brownian",
@@ -320,6 +320,9 @@ function collectDependencies(
   switch (node.type) {
     case "identifier":
       if (node.name !== parameterName && node.name !== localProcessName) {
+        if (node.name in BUILTIN_CONSTANTS) {
+          return dependencies;
+        }
         dependencies.add(node.name);
       }
       return dependencies;
@@ -501,6 +504,9 @@ export function inferExpressionType(
       return "number";
     case "identifier":
       if (node.name === parameterName) {
+        return "number";
+      }
+      if (node.name in BUILTIN_CONSTANTS) {
         return "number";
       }
       return getType(node.name) ?? "number";

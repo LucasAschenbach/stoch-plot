@@ -131,6 +131,42 @@ describe("notebook evaluator endpoint laws", () => {
 });
 
 describe("stochastic calculus DSL", () => {
+  it("supports built-in mathematical constants in scalar cells", () => {
+    const notebook = evaluateTestNotebook([
+      createCell("constants", "c = pi + e + tau"),
+    ]);
+
+    const value = notebook.records.constants.value;
+    expect(value?.type).toBe("number");
+    if (!value || value.type !== "number") {
+      throw new Error("Expected numeric output.");
+    }
+
+    expect(value.value).toBeCloseTo(Math.PI + Math.E + 2 * Math.PI, 12);
+  });
+
+  it("supports additional analytic functions in process expressions", () => {
+    const notebook = evaluateTestNotebook([
+      createCell("derived", "X_t = tan(pi / 4) + atan(t) + sinh(t) + tanh(t) + cosh(0 * t)"),
+    ]);
+
+    const process = notebook.records.derived.value;
+    expect(process?.type).toBe("process");
+    if (!process || process.type !== "process") {
+      throw new Error("Expected process output.");
+    }
+
+    expect(process.paths[0][0]).toBeCloseTo(2, 9);
+    expect(process.paths[0].at(-1) ?? 0).toBeCloseTo(
+      Math.tan(Math.PI / 4) +
+        Math.atan(1) +
+        Math.sinh(1) +
+        Math.tanh(1) +
+        Math.cosh(0),
+      9,
+    );
+  });
+
   it("treats t as the process-time variable in derived process cells", () => {
     const notebook = evaluateTestNotebook([
       createCell("mu", "mu = 2"),

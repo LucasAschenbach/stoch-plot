@@ -30,7 +30,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { SCALAR_FUNCTIONS } from "@/lib/runtime/math"
+import { BUILTIN_CONSTANTS, SCALAR_FUNCTIONS } from "@/lib/runtime/math"
 import { PROCESS_DEFINITIONS } from "@/lib/runtime/processes"
 import type { NotebookCell, RuntimeValue } from "@/lib/runtime/types"
 import { useNotebookStore } from "@/lib/store/use-notebook-store"
@@ -118,6 +118,13 @@ function DocsModalContent() {
             <h3 className="font-semibold mb-2">Scalar Functions</h3>
             <p className="text-muted-foreground">
               {Object.keys(SCALAR_FUNCTIONS).join(", ")}
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold mb-2">Math Constants</h3>
+            <p className="text-muted-foreground">
+              {Object.keys(BUILTIN_CONSTANTS).join(", ")}
             </p>
           </section>
 

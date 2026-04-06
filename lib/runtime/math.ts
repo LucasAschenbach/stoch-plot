@@ -1,10 +1,23 @@
+export const BUILTIN_CONSTANTS: Record<string, number> = {
+  e: Math.E,
+  pi: Math.PI,
+  tau: Math.PI * 2,
+};
+
 export const SCALAR_FUNCTIONS: Record<string, (...args: number[]) => number> = {
   abs: Math.abs,
+  acos: Math.acos,
+  asin: Math.asin,
+  atan: Math.atan,
   cos: Math.cos,
+  cosh: Math.cosh,
   exp: Math.exp,
   log: Math.log,
   sin: Math.sin,
+  sinh: Math.sinh,
   sqrt: Math.sqrt,
+  tan: Math.tan,
+  tanh: Math.tanh,
 };
 
 export function clamp(value: number, min: number, max: number) {

@@ -8,6 +8,7 @@ import {
   transformEndpointLaw,
 } from "@/lib/runtime/endpoint-laws";
 import {
+  BUILTIN_CONSTANTS,
   linspace,
   meanByIndex,
   SCALAR_FUNCTIONS,
@@ -359,6 +360,9 @@ function evaluateScalarExpression(
       if (node.name in localNumbers) {
         return localNumbers[node.name];
       }
+      if (node.name in BUILTIN_CONSTANTS) {
+        return BUILTIN_CONSTANTS[node.name];
+      }
       if (!(node.name in symbols)) {
         throw new Error(`Unknown symbol '${node.name}'.`);
       }
@@ -438,6 +442,10 @@ function materializeExpression(
     case "time":
       return store({ type: "process", value: timeProcess(context.times) });
     case "identifier": {
+      if (node.name in BUILTIN_CONSTANTS) {
+        return store({ type: "number", value: BUILTIN_CONSTANTS[node.name] });
+      }
+
       const symbol = symbols[node.name];
 
       if (!symbol) {
@@ -855,6 +863,10 @@ function evaluatePointwiseValue(
     case "identifier": {
       if (env.localNumbers && node.name in env.localNumbers) {
         return env.localNumbers[node.name];
+      }
+
+      if (node.name in BUILTIN_CONSTANTS) {
+        return BUILTIN_CONSTANTS[node.name];
       }
 
       if (env.selfProcessName === node.name && env.selfValue !== undefined) {
