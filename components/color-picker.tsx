@@ -17,14 +17,14 @@ import {
 } from "@/lib/utils/color"
 
 const SOLID_COLORS = [
-  "#10b981", // emerald
-  "#3b82f6", // blue
-  "#8b5cf6", // violet
-  "#f59e0b", // amber
-  "#ef4444", // red
-  "#ec4899", // pink
-  "#06b6d4", // cyan
-  "#84cc16", // lime
+  { value: "#10b981", label: "Emerald" },
+  { value: "#3b82f6", label: "Blue" },
+  { value: "#8b5cf6", label: "Violet" },
+  { value: "#f59e0b", label: "Amber" },
+  { value: "#ef4444", label: "Red" },
+  { value: "#ec4899", label: "Pink" },
+  { value: "#06b6d4", label: "Cyan" },
+  { value: "#84cc16", label: "Lime" },
 ]
 
 interface ColorPickerProps {
@@ -89,15 +89,15 @@ export function ColorPicker({
       <DropdownMenuContent align="start" className="w-48">
         {SOLID_COLORS.map((solidColor) => (
           <DropdownMenuItem
-            key={solidColor}
+            key={solidColor.value}
             className="gap-2 cursor-pointer"
             onClick={() => {
-              onSelectSolid?.(solidColor)
+              onSelectSolid?.(solidColor.value)
               setIsOpen(false)
             }}
           >
-            <ColorSwatch className="size-5" background={solidColor} />
-            <span>{solidColor.toUpperCase()}</span>
+            <ColorSwatch className="size-5" background={solidColor.value} />
+            <span>{solidColor.label}</span>
           </DropdownMenuItem>
         ))}
         <DropdownMenuItem
