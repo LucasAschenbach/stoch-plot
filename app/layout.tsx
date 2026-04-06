@@ -25,20 +25,8 @@ export const metadata: Metadata = {
   description: 'Interactive notebook for stochastic processes, sampled paths, and endpoint laws.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: withBasePath('/icon-light-32x32.png'),
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: withBasePath('/icon-dark-32x32.png'),
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: withBasePath('/icon.svg'),
-        type: 'image/svg+xml',
-      },
-    ],
+    icon: withBasePath('/icon.svg'),
+    shortcut: withBasePath('/icon.svg'),
     apple: withBasePath('/apple-icon.png'),
   },
 }

@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="public/icon.svg" alt="Stochastic Plotter icon" width="96" height="96" />
   <h1>Stochastic Plotter</h1>
   <p>
     <strong>Desmos for Stochastic Processes.</strong><br />
