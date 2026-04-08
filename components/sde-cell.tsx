@@ -26,6 +26,7 @@ interface SDECellProps {
   onTogglePaths?: () => void
   onSampleCountChange?: (value: number) => void
   onSourceChange?: (value: string) => void
+  onSourceCommit?: () => void
   onSelectSolid?: (color: string) => void
   onSelectScheme?: (mode: Exclude<ColorMode, "solid">) => void
 }
@@ -71,6 +72,7 @@ export function SDECell({
   onTogglePaths,
   onSampleCountChange,
   onSourceChange,
+  onSourceCommit,
   onSelectSolid,
   onSelectScheme,
 }: SDECellProps) {
@@ -82,6 +84,12 @@ export function SDECell({
           value={source}
           onPointerDown={(event) => event.stopPropagation()}
           onChange={(event) => onSourceChange?.(event.target.value)}
+          onBlur={() => onSourceCommit?.()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur()
+            }
+          }}
           spellCheck={false}
           className="min-w-0 flex-1 bg-transparent font-serif text-sm italic text-foreground outline-none"
         />

@@ -1,6 +1,13 @@
 "use client"
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react"
+import {
+  startTransition,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import {
   closestCenter,
   DndContext,
@@ -69,6 +76,8 @@ function processColorPatch(mode: NotebookCell["display"]["colorMode"], fallback:
     color: representativeColor(mode, fallback),
   }
 }
+
+const SOURCE_COMMIT_DEBOUNCE_MS = 250
 
 function DocsModalContent() {
   const processes = useMemo(
@@ -181,7 +190,9 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
   const updateSlider = useNotebookStore((state) => state.updateSlider)
   const removeCell = useNotebookStore((state) => state.removeCell)
   const sourceInputRef = useRef<HTMLInputElement>(null)
+  const commitTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
   const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null)
+  const [draftSource, setDraftSource] = useState(cell.source)
 
   const fallbackKind = fallbackKindForSource(cell.source)
   const resolvedKind = record?.kind ?? fallbackKind
@@ -198,6 +209,12 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
     record?.value?.type === "process"
   const canHover = isFunction || isProcess
 
+  useEffect(() => {
+    if (document.activeElement !== sourceInputRef.current) {
+      setDraftSource(cell.source)
+    }
+  }, [cell.source])
+
   useLayoutEffect(() => {
     const pendingSelection = pendingSelectionRef.current
     const input = sourceInputRef.current
@@ -212,9 +229,31 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
     pendingSelectionRef.current = null
   }, [cell.source, resolvedKind])
 
-  const handleSourceChange = (value: string) => {
+  useEffect(() => {
+    return () => {
+      if (commitTimerRef.current !== null) {
+        window.clearTimeout(commitTimerRef.current)
+      }
+    }
+  }, [])
+
+  const commitSource = (
+    value: string,
+    options: {
+      preserveFocus?: boolean
+    } = {},
+  ) => {
+    if (commitTimerRef.current !== null) {
+      window.clearTimeout(commitTimerRef.current)
+      commitTimerRef.current = null
+    }
+
+    if (value === cell.source) {
+      return
+    }
+
     const input = sourceInputRef.current
-    if (input && document.activeElement === input) {
+    if (options.preserveFocus && input && document.activeElement === input) {
       pendingSelectionRef.current = {
         start: input.selectionStart ?? value.length,
         end: input.selectionEnd ?? value.length,
@@ -223,7 +262,24 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
       pendingSelectionRef.current = null
     }
 
-    updateCellSource(cell.id, value)
+    startTransition(() => {
+      updateCellSource(cell.id, value)
+    })
+  }
+
+  const scheduleSourceCommit = (value: string) => {
+    if (commitTimerRef.current !== null) {
+      window.clearTimeout(commitTimerRef.current)
+    }
+
+    commitTimerRef.current = window.setTimeout(() => {
+      commitSource(value, { preserveFocus: true })
+    }, SOURCE_COMMIT_DEBOUNCE_MS)
+  }
+
+  const handleSourceChange = (value: string) => {
+    setDraftSource(value)
+    scheduleSourceCommit(value)
   }
 
   const wrapperProps = {
@@ -251,7 +307,7 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
     return (
       <div {...wrapperProps} {...hoverHandlers} className={`${wrapperProps.className} ${baseClassName}`}>
         <ParameterCell
-          source={cell.source}
+          source={draftSource}
           sourceInputRef={sourceInputRef}
           error={record?.error}
           min={cell.slider.min}
@@ -260,6 +316,7 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
           sliderValue={effectiveSliderValue}
           onDelete={() => removeCell(cell.id)}
           onSourceChange={handleSourceChange}
+          onSourceCommit={() => commitSource(draftSource)}
           onSliderValueChange={(value) =>
             updateCellSource(
               cell.id,
@@ -280,7 +337,7 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
     return (
       <div {...wrapperProps} {...hoverHandlers} className={`${wrapperProps.className} ${baseClassName}`}>
         <FunctionCell
-          source={cell.source}
+          source={draftSource}
           sourceInputRef={sourceInputRef}
           error={record?.error}
           color={cell.display.color}
@@ -289,6 +346,7 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
           onDelete={() => removeCell(cell.id)}
           onToggleVisibility={() => updateDisplay(cell.id, { visible: !cell.display.visible })}
           onSourceChange={handleSourceChange}
+          onSourceCommit={() => commitSource(draftSource)}
           onSelectSolid={(color) => updateDisplay(cell.id, { color, colorMode: "solid" })}
           onSelectScheme={(mode) => updateDisplay(cell.id, processColorPatch(mode, cell.display.color))}
         />
@@ -299,7 +357,7 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
   return (
     <div {...wrapperProps} {...hoverHandlers} className={`${wrapperProps.className} ${baseClassName}`}>
       <SDECell
-        source={cell.source}
+        source={draftSource}
         sourceInputRef={sourceInputRef}
         error={record?.error}
         color={cell.display.color}
@@ -322,6 +380,7 @@ function SortableCellRow({ cell }: { cell: NotebookCell }) {
           })
         }
         onSourceChange={handleSourceChange}
+        onSourceCommit={() => commitSource(draftSource)}
         onSelectSolid={(color) => updateDisplay(cell.id, { color, colorMode: "solid" })}
         onSelectScheme={(mode) => updateDisplay(cell.id, processColorPatch(mode, cell.display.color))}
       />

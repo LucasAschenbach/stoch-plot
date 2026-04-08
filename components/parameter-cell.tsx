@@ -16,6 +16,7 @@ interface ParameterCellProps {
   sliderValue: number
   onDelete?: () => void
   onSourceChange?: (value: string) => void
+  onSourceCommit?: () => void
   onSliderValueChange?: (value: number[]) => void
   onMinChange?: (value: number) => void
   onMaxChange?: (value: number) => void
@@ -80,6 +81,7 @@ export function ParameterCell({
   sliderValue,
   onDelete,
   onSourceChange,
+  onSourceCommit,
   onSliderValueChange,
   onMinChange,
   onMaxChange,
@@ -93,6 +95,12 @@ export function ParameterCell({
           value={source}
           onPointerDown={(event) => event.stopPropagation()}
           onChange={(event) => onSourceChange?.(event.target.value)}
+          onBlur={() => onSourceCommit?.()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur()
+            }
+          }}
           spellCheck={false}
           className="min-w-0 flex-1 bg-transparent font-serif text-sm italic text-foreground outline-none"
         />
